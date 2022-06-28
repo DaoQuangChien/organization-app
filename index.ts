@@ -1,25 +1,59 @@
-import { data, structure, Action, Employee, IEmployeeOrgApp } from "./data";
+import { Action, Employee, IEmployeeOrgApp } from "./data";
 
 class EmployeeOrgApp implements IEmployeeOrgApp {
   ceo: Employee;
-  staff: Employee[] = [];
   undoStack: Action[] = [];
   redoStack: Action[] = [];
 
   constructor(employee: Employee) {
     this.ceo = employee;
-    this.staff.push(employee);
-  }
-
-  addStaff(employee: Employee) {
-    this.staff.push(employee);
   }
 
   move(employeeID: number, supervisorID: number) {
-    const fromSupervisor = this.findSupervisorOfEmployee(employeeID);
-    const toSupervisor = this.findEmployee(supervisorID);
-    const moveEmployee = this.findEmployee(employeeID);
+    const findEmployee = (
+      employee: Employee,
+      id: number
+    ): Employee | undefined => {
+      if (employee.uniqueId === id) {
+        return employee;
+      }
+      for (let i = 0; i < employee.subordinates.length; i++) {
+        const sub = findEmployee(employee.subordinates[i], id);
 
+        if (sub) {
+          return sub;
+        }
+      }
+      if (employee.uniqueId !== id) {
+        return undefined;
+      }
+    };
+    const findSupervisorOfEmployee = (
+      employee: Employee,
+      id: number
+    ): Employee | undefined => {
+      if (employee.subordinates.find((sub) => sub.uniqueId === id)) {
+        return employee;
+      }
+      for (let i = 0; i < employee.subordinates.length; i++) {
+        const sub = findSupervisorOfEmployee(employee.subordinates[i], id);
+
+        if (sub) {
+          return sub;
+        }
+      }
+      if (!employee.subordinates.length) {
+        return undefined;
+      }
+    };
+    const fromSupervisor = findSupervisorOfEmployee(this.ceo, employeeID);
+    const toSupervisor = findEmployee(this.ceo, supervisorID);
+    const moveEmployee = findEmployee(this.ceo, employeeID);
+
+    if (employeeID === 1) {
+      console.log("Can't move the CEO");
+      return;
+    }
     if (!toSupervisor || !moveEmployee) {
       console.log("Something is wrong!");
       return;
@@ -36,15 +70,16 @@ class EmployeeOrgApp implements IEmployeeOrgApp {
     };
 
     if (fromSupervisor) {
-      fromSupervisor.subordinates = fromSupervisor.subordinates.concat(
-        moveEmployee.subordinates
-      );
+      fromSupervisor.subordinates = fromSupervisor.subordinates
+        .filter((sub) => sub.uniqueId !== employeeID)
+        .concat(moveEmployee.subordinates);
     }
     moveEmployee.subordinates = [];
     toSupervisor.subordinates = toSupervisor.subordinates.concat([
       moveEmployee,
     ]);
     this.undoStack.push(action);
+    this.redoStack = [];
   }
 
   undo() {
@@ -71,45 +106,19 @@ class EmployeeOrgApp implements IEmployeeOrgApp {
   redo() {
     if (this.redoStack.length) {
       const action = this.redoStack.pop()!;
-      const { toSupervisor, moveEmployee } = action;
-      this.move(moveEmployee.uniqueId, toSupervisor.uniqueId);
-    }
-  }
+      const { fromSupervisor, toSupervisor, moveEmployee } = action;
 
-  findEmployee(employeeID: number): Employee | undefined {
-    const index = this.staff.findIndex(
-      (employee) => employee.uniqueId === employeeID
-    );
-
-    return index === -1 ? undefined : this.staff[index];
-  }
-
-  findSupervisorOfEmployee(employeeID: number): Employee | undefined {
-    const index = this.staff.findIndex(
-      (employee) =>
-        !!employee.subordinates.find((sub) => sub.uniqueId === employeeID)
-    );
-
-    return index === -1 ? undefined : this.staff[index];
-  }
-
-  printOrg() {
-    console.log("-----Organization-----");
-    const log = (employee: Employee, space: number = 0) => {
-      if (!employee.subordinates.length) {
-        console.log(`${" ".repeat(space)}-${employee.name}`);
-      } else {
-        console.log(`${" ".repeat(space)}-${employee.name}`);
-        employee.subordinates.forEach((sub) => log(sub, space + 2));
+      if (fromSupervisor) {
+        fromSupervisor.subordinates = fromSupervisor.subordinates
+          .filter((sub) => sub.uniqueId !== moveEmployee.uniqueId)
+          .concat(moveEmployee.subordinates);
       }
-    };
-
-    log(this.ceo);
-  }
-
-  clearStack() {
-    this.undoStack = [];
-    this.redoStack = [];
+      moveEmployee.subordinates = [];
+      toSupervisor.subordinates = toSupervisor.subordinates.concat([
+        moveEmployee,
+      ]);
+      this.undoStack.push(action);
+    }
   }
 }
 
@@ -119,102 +128,96 @@ class EmployeeOrgApp implements IEmployeeOrgApp {
 const ceo: Employee = {
   uniqueId: 1,
   name: "Mark Zuckerberg",
-  subordinates: [],
+  subordinates: [
+    {
+      uniqueId: 2,
+      name: "Sarah Donald",
+      subordinates: [
+        {
+          uniqueId: 6,
+          name: "Cassandra Reynolds",
+          subordinates: [
+            {
+              uniqueId: 11,
+              name: "Mary Blue",
+              subordinates: [],
+            },
+            {
+              uniqueId: 12,
+              name: "Bob Saget",
+              subordinates: [
+                {
+                  uniqueId: 14,
+                  name: "Tina Teff",
+                  subordinates: [
+                    {
+                      uniqueId: 15,
+                      name: "Will Turner",
+                      subordinates: [],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      uniqueId: 3,
+      name: "Tyler Simpson",
+      subordinates: [
+        {
+          uniqueId: 7,
+          name: "Harry Tobs",
+          subordinates: [
+            {
+              uniqueId: 13,
+              name: "Thomas Brown",
+              subordinates: [],
+            },
+          ],
+        },
+        {
+          uniqueId: 8,
+          name: "George Carrey",
+          subordinates: [],
+        },
+        {
+          uniqueId: 9,
+          name: "Gary Styles",
+          subordinates: [],
+        },
+      ],
+    },
+    {
+      uniqueId: 4,
+      name: "Bruce Willis",
+      subordinates: [],
+    },
+    {
+      uniqueId: 5,
+      name: "Georgina Flangy",
+      subordinates: [
+        {
+          uniqueId: 10,
+          name: "Sophie Turner",
+          subordinates: [],
+        },
+      ],
+    },
+  ],
 };
 
 const app = new EmployeeOrgApp(ceo);
 
-data.forEach((employee) => app.addStaff(employee));
-Object.entries(structure).forEach(([supervisorID, subordinateIDs]) =>
-  subordinateIDs.forEach((employeeID) =>
-    app.move(employeeID, Number(supervisorID))
-  )
-);
-// app.printOrg();
-/*
------Organization-----
--Mark Zuckerberg
-  -Sarah Donald
-    -Cassandra Reynolds
-      -Mary Blue
-      -Bob Saget
-        -Tina Teff
-          -Will Turner
-  -Tyler Simpson
-    -Harry Tobs
-      -Thomas Brown
-    -George Carrey
-    -Gary Styles
-  -Bruce Willis
-  -Georgina Flangy
-    -Sophie Turner
-*/
-app.clearStack();
-
-///////
-
 app.move(12, 3); // move Bob Saget -> Tyler Simpson
-// app.printOrg();
-/*
------Organization-----
--Mark Zuckerberg
-  -Sarah Donald
-    -Cassandra Reynolds
-      -Mary Blue
-      -Bob Saget
-      -Tina Teff
-        -Will Turner
-  -Tyler Simpson
-    -Harry Tobs
-      -Thomas Brown
-    -George Carrey
-    -Gary Styles
-    -Bob Saget
-  -Bruce Willis
-  -Georgina Flangy
-    -Sophie Turner
-*/
+app.move(7, 4); // move Harry Tobs -> Bruce Willis
 app.undo();
-// app.printOrg();
-/*
------Organization-----
--Mark Zuckerberg
-  -Sarah Donald
-    -Cassandra Reynolds
-      -Mary Blue
-      -Bob Saget
-        -Tina Teff
-          -Will Turner
-  -Tyler Simpson
-    -Harry Tobs
-      -Thomas Brown
-    -George Carrey
-    -Gary Styles
-  -Bruce Willis
-  -Georgina Flangy
-    -Sophie Turner
-*/
+// app.undo();
+app.move(14, 4); // move Tina Teff -> Bruce Willis
 app.redo();
-app.printOrg();
-/*
------Organization-----
--Mark Zuckerberg
-  -Sarah Donald
-    -Cassandra Reynolds
-      -Mary Blue
-      -Bob Saget
-      -Tina Teff
-        -Will Turner
-  -Tyler Simpson
-    -Harry Tobs
-      -Thomas Brown
-    -George Carrey
-    -Gary Styles
-    -Bob Saget
-  -Bruce Willis
-  -Georgina Flangy
-    -Sophie Turner
-
-*/
+app.undo();
+// app.redo();
 
 /* *********************************************************************************************************** */
